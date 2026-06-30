@@ -16,14 +16,14 @@
 </head>
 <body class="bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800 min-h-screen h-screen w-screen overflow-hidden font-sans flex p-0 m-0">
 
-    <div id="widget-container" class="w-full h-full p-[2vmin] flex flex-col justify-between relative overflow-hidden transition-all duration-100 ease-out">
+    <div id="widget-container" class="w-full h-full p-[2vmin] flex flex-col justify-between relative overflow-hidden">
         
         <div id="search-panel" class="hidden absolute inset-0 bg-white/95 backdrop-blur-md z-30 p-[4vmin] flex flex-col">
             <div class="flex items-center gap-[2vmin] mb-[3vmin]">
                 <div class="relative flex-1">
-                    <input id="city-input" type="text" placeholder="Wpisz miasto..." class="w-full bg-slate-100 text-slate-800 rounded-[3vmin] py-[2.5vmin] pl-[3vmin] pr-[8vmin] focus:outline-none focus:ring-[0.5vmin] focus:ring-orange-400 border border-slate-200">
+                    <input id="city-input" type="text" placeholder="Wpisz miasto..." class="w-full bg-slate-100 text-slate-800 rounded-[3vmin] py-[3vmin] pl-[4vmin] pr-[8vmin] text-[4vmin] focus:outline-none focus:ring-[0.5vmin] focus:ring-orange-400 border border-slate-200">
                 </div>
-                <button id="close-search-btn" class="p-[2vmin] text-slate-500 hover:text-slate-800 font-semibold">Anuluj</button>
+                <button id="close-search-btn" class="p-[3vmin] text-slate-600 font-bold text-[3.5vmin]">Zamknij</button>
             </div>
             <div id="search-results" class="flex-1 overflow-y-auto custom-scrollbar space-y-[1vmin]"></div>
         </div>
@@ -33,8 +33,9 @@
                 <span id="widget-city" class="text-[5.2vmin] font-extrabold tracking-tight text-slate-800 truncate">Warszawa</span>
                 <span id="widget-country" class="text-[3.1vmin] font-medium text-slate-500 truncate">Polska</span>
             </div>
-            <button id="search-toggle-btn" class="p-[2vmin] hover:bg-slate-200/50 rounded-full transition-all text-slate-600">
-                <i data-lucide="search" class="w-[5vmin] h-[5vmin]"></i>
+            <!-- Zwiększony padding i kontrast dla lupy -->
+            <button id="search-toggle-btn" class="p-[3vmin] bg-slate-800/10 hover:bg-slate-800/20 rounded-full transition-all text-slate-900 shadow-sm">
+                <i data-lucide="search" class="w-[6vmin] h-[6vmin]"></i>
             </button>
         </div>
 
@@ -74,7 +75,6 @@
     </div>
 
     <script>
-        // Pobierz zapisaną lokalizację lub ustaw domyślną
         let currentLocation = JSON.parse(localStorage.getItem('weather_app_loc')) || { name: "Warszawa", country: "Polska", lat: 52.2298, lon: 21.0118 };
         let currentMode = 'today';
         let weatherData = null;
@@ -116,11 +116,10 @@
             if(data.results) {
                 data.results.forEach(city => {
                     const btn = document.createElement('button');
-                    btn.className = 'w-full text-left p-[3vmin] bg-white rounded-[2vmin] hover:bg-slate-100';
-                    btn.innerHTML = `<div class="font-bold">${city.name}</div><div class="text-[2.5vmin] text-slate-500">${city.country}</div>`;
+                    btn.className = 'w-full text-left p-[4vmin] bg-white rounded-[2vmin] hover:bg-slate-100 border border-slate-100';
+                    btn.innerHTML = `<div class="font-bold text-[3.5vmin]">${city.name}</div><div class="text-[3vmin] text-slate-500">${city.country}</div>`;
                     btn.onclick = () => {
                         currentLocation = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
-                        // ZAPIS DO LOCAL STORAGE
                         localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
                         document.getElementById('search-panel').classList.add('hidden');
                         fetchWeatherData();
@@ -131,7 +130,12 @@
         }
 
         document.getElementById('city-input').oninput = (e) => searchCity(e.target.value);
-        document.getElementById('search-toggle-btn').onclick = () => document.getElementById('search-panel').classList.remove('hidden');
+        
+        document.getElementById('search-toggle-btn').onclick = () => {
+            document.getElementById('search-panel').classList.remove('hidden');
+            setTimeout(() => document.getElementById('city-input').focus(), 100); // Fokus po otwarciu
+        };
+        
         document.getElementById('close-search-btn').onclick = () => document.getElementById('search-panel').classList.add('hidden');
 
         function renderChart() {
