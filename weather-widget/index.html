@@ -4,74 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Widget Pogodowy</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Import jQuery -->
+    <!-- jQuery for reliable AJAX -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 0.8vmin; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.03); border-radius: 2vmin; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); border-radius: 2vmin; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.2); }
     </style>
 </head>
-<body class="bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800 min-h-screen h-screen w-screen overflow-hidden font-sans flex p-0 m-0">
+<body class="bg-gradient-to-br from-sky-100 via-blue-50 to-amber-50 text-slate-800 min-h-screen h-screen w-screen overflow-hidden font-sans m-0 p-0">
 
-    <div id="widget-container" class="w-full h-full p-[2vmin] flex flex-col justify-between relative overflow-hidden">
+    <!-- Kontener Edge-to-Edge: p-0 zapewnia wypełnienie całego ekranu -->
+    <div id="widget-container" class="w-full h-full flex flex-col justify-between relative overflow-hidden">
         
+        <!-- Panel Wyszukiwania -->
         <div id="search-panel" class="hidden absolute inset-0 bg-white/95 backdrop-blur-md z-30 p-[4vmin] flex flex-col">
             <div class="flex items-center gap-[2vmin] mb-[3vmin]">
                 <div class="relative flex-1">
-                    <input id="city-input" type="text" placeholder="Wpisz miasto..." class="w-full bg-slate-100 text-slate-800 rounded-[3vmin] py-[3vmin] pl-[4vmin] pr-[8vmin] text-[4vmin] focus:outline-none focus:ring-[0.5vmin] focus:ring-orange-400 border border-slate-200">
+                    <input id="city-input" type="text" placeholder="Wpisz miasto..." class="w-full bg-slate-100 text-slate-800 rounded-[3vmin] py-[3vmin] pl-[4vmin] text-[4vmin] focus:outline-none border border-slate-200">
                 </div>
                 <button id="close-search-btn" class="p-[3vmin] text-slate-600 font-bold text-[3.5vmin]">Zamknij</button>
             </div>
             <div id="search-results" class="flex-1 overflow-y-auto custom-scrollbar space-y-[1vmin]"></div>
         </div>
 
-        <div class="z-10 flex items-center justify-between">
+        <!-- Nagłówek -->
+        <div class="z-10 flex items-center justify-between p-[4vmin]">
             <div class="flex flex-col">
                 <span id="widget-city" class="text-[5.2vmin] font-extrabold tracking-tight text-slate-800 truncate">Warszawa</span>
                 <span id="widget-country" class="text-[3.1vmin] font-medium text-slate-500 truncate">Polska</span>
             </div>
-            <button id="search-toggle-btn" class="p-[3vmin] bg-slate-800/10 hover:bg-slate-800/20 rounded-full transition-all text-slate-900 shadow-sm">
+            <button id="search-toggle-btn" class="p-[3vmin] bg-slate-800/10 rounded-full text-slate-900 shadow-sm">
                 <i data-lucide="search" class="w-[6vmin] h-[6vmin]"></i>
             </button>
         </div>
 
-        <div class="z-10 flex items-center justify-between">
+        <!-- Dane pogodowe -->
+        <div class="z-10 flex items-center justify-between px-[4vmin] py-[2vmin]">
             <div class="flex items-center gap-[3vmin]">
                 <div class="w-[14vmin] h-[14vmin] rounded-[4vmin] bg-white/80 flex items-center justify-center border border-slate-200/50">
-                    <i data-lucide="sun" id="main-weather-icon" class="w-[8vmin] h-[8vmin] text-orange-500"></i>
+                    <i data-lucide="sun" class="w-[8vmin] h-[8vmin] text-orange-500"></i>
                 </div>
-                <div class="flex flex-col">
-                    <div class="flex items-baseline">
-                        <span id="current-temp" class="text-[10vmin] font-black tracking-tight">--</span>
-                        <span class="text-[6vmin] font-bold text-orange-500">°C</span>
-                    </div>
-                    <span id="weather-description" class="text-[3.2vmin] text-slate-600 font-semibold">Aktualne warunki</span>
+                <div>
+                    <span id="current-temp" class="text-[10vmin] font-black leading-none">--</span><span class="text-[6vmin] font-bold text-orange-500">°C</span>
                 </div>
             </div>
             <div class="text-right text-[2.8vmin] text-slate-500">
-                <div>Wiatr: <span id="wind-speed" class="font-bold text-slate-800">-- km/h</span></div>
-                <div>Opad: <span id="precipitation" class="font-bold text-slate-800">-- mm</span></div>
+                <div>Wiatr: <span id="wind-speed" class="font-bold text-slate-800">--</span></div>
+                <div>Opad: <span id="precipitation" class="font-bold text-slate-800">--</span></div>
             </div>
         </div>
 
-        <div class="z-10 flex bg-slate-200/50 p-[0.5vmin] rounded-[3vmin] text-[3vmin] font-bold text-slate-500 gap-[0.5vmin]">
+        <!-- Przełącznik -->
+        <div class="z-10 flex bg-slate-200/50 p-[0.5vmin] rounded-[3vmin] mx-[4vmin] mb-[2vmin] text-[3vmin] font-bold text-slate-500 gap-[0.5vmin]">
             <button id="tab-today" class="flex-1 py-[1.5vmin] rounded-[2.5vmin] bg-white text-slate-800 shadow-sm">Dzisiaj</button>
             <button id="tab-tomorrow" class="flex-1 py-[1.5vmin] rounded-[2.5vmin]">Jutro</button>
             <button id="tab-week" class="flex-1 py-[1.5vmin] rounded-[2.5vmin]">Tydzień</button>
         </div>
 
-        <div class="z-10 bg-white/40 rounded-[4vmin] p-[2vmin] border border-white/80 flex-[0.8] flex flex-col justify-between">
-            <div class="flex items-center justify-between text-[2.5vmin] text-slate-500 px-[1vmin]">
-                <span class="flex items-center gap-[2vmin] font-semibold">Prognoza</span>
-            </div>
-            <div class="relative w-full flex-1">
-                <canvas id="hourlyChart"></canvas>
-            </div>
+        <!-- Wykres -->
+        <div class="z-10 bg-white/40 flex-1 relative px-[4vmin] pb-[4vmin] pt-[2vmin]">
+            <canvas id="hourlyChart"></canvas>
         </div>
     </div>
 
@@ -81,20 +80,6 @@
         let weatherData = null;
         let hourlyChart = null;
 
-        const tabs = { today: document.getElementById('tab-today'), tomorrow: document.getElementById('tab-tomorrow'), week: document.getElementById('tab-week') };
-
-        const updateUI = () => {
-            Object.keys(tabs).forEach(k => {
-                tabs[k].classList.toggle('bg-white', k === currentMode);
-                tabs[k].classList.toggle('text-slate-800', k === currentMode);
-                tabs[k].classList.toggle('shadow-sm', k === currentMode);
-            });
-            fetchWeatherData();
-        };
-
-        Object.keys(tabs).forEach(k => tabs[k].onclick = () => { currentMode = k; updateUI(); });
-
-        // Używamy $.ajax zamiast fetch
         function fetchWeatherData() {
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current_weather=true&hourly=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=7&timezone=auto`;
             
@@ -104,60 +89,45 @@
                 dataType: 'json',
                 success: function(data) {
                     weatherData = data;
-                    document.getElementById('widget-city').innerText = currentLocation.name;
-                    document.getElementById('widget-country').innerText = currentLocation.country;
-                    document.getElementById('current-temp').innerText = Math.round(weatherData.current_weather.temperature);
-                    document.getElementById('wind-speed').innerText = weatherData.current_weather.windspeed + ' km/h';
-                    document.getElementById('precipitation').innerText = (weatherData.hourly.precipitation[0] || 0) + ' mm';
+                    $('#widget-city').text(currentLocation.name);
+                    $('#widget-country').text(currentLocation.country);
+                    $('#current-temp').text(Math.round(data.current_weather.temperature));
+                    $('#wind-speed').text(data.current_weather.windspeed + ' km/h');
+                    $('#precipitation').text((data.hourly.precipitation[0] || 0) + ' mm');
                     renderChart();
                 },
-                error: function(err) {
-                    console.error("Błąd przy pobieraniu danych:", err);
-                }
+                error: function(err) { console.error("AJAX Error:", err); }
             });
         }
 
-        async function searchCity(query) {
+        function searchCity(query) {
             if(query.length < 2) return;
-            // Tutaj również możemy zmienić na $.ajax dla spójności
             $.ajax({
                 url: `https://geocoding-api.open-meteo.com/v1/search?name=${query}&language=pl&count=5`,
-                method: 'GET',
                 success: function(data) {
-                    const resultsDiv = document.getElementById('search-results');
-                    resultsDiv.innerHTML = '';
+                    const resultsDiv = $('#search-results').empty();
                     if(data.results) {
                         data.results.forEach(city => {
-                            const btn = document.createElement('button');
-                            btn.className = 'w-full text-left p-[4vmin] bg-white rounded-[2vmin] hover:bg-slate-100 border border-slate-100';
-                            btn.innerHTML = `<div class="font-bold text-[3.5vmin]">${city.name}</div><div class="text-[3vmin] text-slate-500">${city.country}</div>`;
-                            btn.onclick = () => {
-                                currentLocation = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
-                                localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
-                                document.getElementById('search-panel').classList.add('hidden');
-                                fetchWeatherData();
-                            };
-                            resultsDiv.appendChild(btn);
+                            $('<button>').addClass('w-full text-left p-[4vmin] bg-white rounded-[2vmin] hover:bg-slate-100')
+                                .html(`<div class="font-bold text-[3.5vmin]">${city.name}</div><div class="text-[3vmin] text-slate-500">${city.country}</div>`)
+                                .on('click', () => {
+                                    currentLocation = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
+                                    localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
+                                    $('#search-panel').addClass('hidden');
+                                    fetchWeatherData();
+                                }).appendTo(resultsDiv);
                         });
                     }
                 }
             });
         }
 
-        document.getElementById('city-input').oninput = (e) => searchCity(e.target.value);
-        
-        document.getElementById('search-toggle-btn').onclick = () => {
-            document.getElementById('search-panel').classList.remove('hidden');
-            setTimeout(() => document.getElementById('city-input').focus(), 100);
-        };
-        
-        document.getElementById('close-search-btn').onclick = () => document.getElementById('search-panel').classList.add('hidden');
-
         function renderChart() {
             const ctx = document.getElementById('hourlyChart').getContext('2d');
             if (hourlyChart) hourlyChart.destroy();
+            
             const labels = [], dataTemp = [], dataTempMin = [], dataRain = [];
-
+            
             if (currentMode === 'week') {
                 weatherData.daily.time.forEach((day, i) => {
                     labels.push(new Date(day).toLocaleDateString('pl', { weekday: 'short' }));
@@ -178,23 +148,24 @@
                 { label: 'Deszcz', data: dataRain, type: 'bar', backgroundColor: 'rgba(14, 165, 233, 0.6)', yAxisID: 'y1', order: 2 },
                 { label: 'Temp', data: dataTemp, type: 'line', borderColor: '#f97316', fill: false, tension: 0.4, order: 1 }
             ];
-
             if(currentMode === 'week') {
                 datasets.push({ label: 'Temp Min', data: dataTempMin, type: 'line', borderColor: '#3b82f6', fill: false, tension: 0.4, order: 1 });
             }
 
             hourlyChart = new Chart(ctx, {
                 data: { labels, datasets },
-                options: { 
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        y: { position: 'left', title: { display: true, text: '°C' } },
-                        y1: { position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'mm' } }
-                    }
-                }
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { position: 'left' }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
             });
         }
-        window.onload = () => { lucide.createIcons(); fetchWeatherData(); };
+
+        $('#tab-today').on('click', () => { currentMode = 'today'; renderChart(); });
+        $('#tab-tomorrow').on('click', () => { currentMode = 'tomorrow'; renderChart(); });
+        $('#tab-week').on('click', () => { currentMode = 'week'; renderChart(); });
+        $('#search-toggle-btn').on('click', () => $('#search-panel').removeClass('hidden'));
+        $('#close-search-btn').on('click', () => $('#search-panel').addClass('hidden'));
+        $('#city-input').on('input', (e) => searchCity(e.target.value));
+
+        $(window).on('load', () => { lucide.createIcons(); fetchWeatherData(); });
     </script>
 </body>
 </html>
