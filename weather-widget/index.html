@@ -75,18 +75,31 @@
     </div>
 
     <script>
-        let currentLocation = JSON.parse(localStorage.getItem('weather_app_loc')) || { name: "Warszawa", country: "Polska", lat: 52.2298, lon: 21.0118 };
+        let currentLocation = { name: "Warszawa", country: "Polska", lat: 52.2298, lon: 21.0118 };
+        
+        // Bezpieczny odczyt z localStorage z obsługą wyjątków WebView
+        try {
+            const savedLoc = localStorage.getItem('weather_app_loc');
+            if (savedLoc) currentLocation = JSON.parse(savedLoc);
+        } catch (e) {
+            console.warn("Brak dostępu do localStorage w WebView (DOM Storage wyłączone).", e);
+        }
+
         let currentMode = 'today';
         let weatherData = null;
         let hourlyChart = null;
 
         function fetchWeatherData() {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current_weather=true&hourly=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=7&timezone=auto`;
+            // Dodajemy unikalny timestamp by oszukać agresywny cache w WebView
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current_weather=true&hourly=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=7&timezone=auto&_t=${new Date().getTime()}`;
             
             $.ajax({
                 url: url,
                 method: 'GET',
                 dataType: 'json',
+                cache: false,
+                crossDomain: true,
+                timeout: 10000,
                 success: function(data) {
                     weatherData = data;
                     $('#widget-city').text(currentLocation.name);
@@ -96,7 +109,11 @@
                     $('#precipitation').text((data.hourly.precipitation[0] || 0) + ' mm');
                     renderChart();
                 },
-                error: function(err) { console.error("AJAX Error:", err); }
+                error: function(xhr, status, err) { 
+                    console.error("AJAX Error:", status, err);
+                    $('#current-temp').text('Err');
+                    $('#widget-country').text('Błąd API: ' + status);
+                }
             });
         }
 
@@ -104,6 +121,8 @@
             if(query.length < 2) return;
             $.ajax({
                 url: `https://geocoding-api.open-meteo.com/v1/search?name=${query}&language=pl&count=5`,
+                cache: false,
+                crossDomain: true,
                 success: function(data) {
                     const resultsDiv = $('#search-results').empty();
                     if(data.results) {
@@ -112,7 +131,11 @@
                                 .html(`<div class="font-bold text-[3.5vmin]">${city.name}</div><div class="text-[3vmin] text-slate-500">${city.country}</div>`)
                                 .on('click', () => {
                                     currentLocation = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
-                                    localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
+                                    try {
+                                        localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
+                                    } catch (e) {
+                                        console.warn("Nie można zapisać do localStorage", e);
+                                    }
                                     $('#search-panel').addClass('hidden');
                                     fetchWeatherData();
                                 }).appendTo(resultsDiv);
@@ -121,6 +144,28 @@
                 }
             });
         }
+
+        // Własny plugin do przyciemniania przeszłości dla widoku "Dzisiaj"
+        const pastShadingPlugin = {
+            id: 'pastShading',
+            beforeDraw: (chart) => {
+                if (currentMode !== 'today' || !weatherData) return;
+                const ctx = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                if (!xAxis || !yAxis) return;
+
+                const now = new Date();
+                const currentHour = now.getHours();
+                const pct = currentHour / 22; // 12 punktów pomiaru (od 0 do 22 z krokiem 2)
+                const rightX = xAxis.left + (xAxis.width * Math.min(1, Math.max(0, pct)));
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.08)'; // Bardzo subtelne, eleganckie przyciemnienie przeszłości
+                ctx.fillRect(xAxis.left, yAxis.top, rightX - xAxis.left, yAxis.bottom - yAxis.top);
+                ctx.restore();
+            }
+        };
 
         function renderChart() {
             const ctx = document.getElementById('hourlyChart').getContext('2d');
@@ -144,28 +189,54 @@
                 }
             }
 
+            // Deszcz z przeźroczystością 60%
             const datasets = [
                 { label: 'Deszcz', data: dataRain, type: 'bar', backgroundColor: 'rgba(14, 165, 233, 0.6)', yAxisID: 'y1', order: 2 },
                 { label: 'Temp', data: dataTemp, type: 'line', borderColor: '#f97316', fill: false, tension: 0.4, order: 1 }
             ];
+
+            // W widoku tygodniowym dodajemy drugą linię dla temperatury minimalnej
             if(currentMode === 'week') {
                 datasets.push({ label: 'Temp Min', data: dataTempMin, type: 'line', borderColor: '#3b82f6', fill: false, tension: 0.4, order: 1 });
             }
 
             hourlyChart = new Chart(ctx, {
                 data: { labels, datasets },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { position: 'left' }, y1: { position: 'right', grid: { drawOnChartArea: false } } } }
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { position: 'left' },
+                        y1: { position: 'right', grid: { drawOnChartArea: false } }
+                    }
+                },
+                plugins: [pastShadingPlugin]
             });
         }
 
-        $('#tab-today').on('click', () => { currentMode = 'today'; renderChart(); });
-        $('#tab-tomorrow').on('click', () => { currentMode = 'tomorrow'; renderChart(); });
-        $('#tab-week').on('click', () => { currentMode = 'week'; renderChart(); });
-        $('#search-toggle-btn').on('click', () => $('#search-panel').removeClass('hidden'));
+        const tabs = ['today', 'tomorrow', 'week'];
+        tabs.forEach(tab => {
+            $(`#tab-${tab}`).on('click', function() {
+                currentMode = tab;
+                tabs.forEach(t => {
+                    $(`#tab-${t}`).toggleClass('bg-white text-slate-800 shadow-sm', t === currentMode);
+                });
+                renderChart();
+            });
+        });
+
+        $('#search-toggle-btn').on('click', () => {
+            $('#search-panel').removeClass('hidden');
+            setTimeout(() => $('#city-input').trigger('focus'), 100);
+        });
+
         $('#close-search-btn').on('click', () => $('#search-panel').addClass('hidden'));
         $('#city-input').on('input', (e) => searchCity(e.target.value));
 
-        $(window).on('load', () => { lucide.createIcons(); fetchWeatherData(); });
+        $(window).on('load', () => {
+            lucide.createIcons();
+            fetchWeatherData();
+        });
     </script>
 </body>
 </html>
