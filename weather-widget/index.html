@@ -10,7 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- jQuery for reliable AJAX -->
+    <!-- jQuery dla stabilnego działania AJAX -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 0.8vmin; }
@@ -37,7 +37,7 @@
         <!-- Nagłówek -->
         <div class="z-10 flex items-center justify-between p-[4vmin]">
             <div class="flex flex-col">
-                <span id="widget-city" class="text-[5.2vmin] font-extrabold tracking-tight text-slate-800 truncate">Warszawa</span>
+                <span id="widget-city" class="text-[5.2vmin] font-extrabold tracking-tight text-slate-800 truncate">Bydgoszcz</span>
                 <span id="widget-country" class="text-[3.1vmin] font-medium text-slate-500 truncate">Polska</span>
             </div>
             <button id="search-toggle-btn" class="p-[3vmin] bg-slate-800/10 rounded-full text-slate-900 shadow-sm">
@@ -61,7 +61,7 @@
             </div>
         </div>
 
-        <!-- Przełącznik -->
+        <!-- Przełącznik okresu -->
         <div class="z-10 flex bg-slate-200/50 p-[0.5vmin] rounded-[3vmin] mx-[4vmin] mb-[2vmin] text-[3vmin] font-bold text-slate-500 gap-[0.5vmin]">
             <button id="tab-today" class="flex-1 py-[1.5vmin] rounded-[2.5vmin] bg-white text-slate-800 shadow-sm">Dzisiaj</button>
             <button id="tab-tomorrow" class="flex-1 py-[1.5vmin] rounded-[2.5vmin]">Jutro</button>
@@ -75,14 +75,83 @@
     </div>
 
     <script>
-        let currentLocation = { name: "Warszawa", country: "Polska", lat: 52.2298, lon: 21.0118 };
+        // Pomocnicze funkcje dla obsługi ciasteczek (Cookies)
+        function setCookie(name, value, days) {
+            try {
+                let expires = "";
+                if (days) {
+                    let date = new Date();
+                    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                    expires = "; expires=" + date.toUTCString();
+                }
+                document.cookie = name + "=" + (encodeURIComponent(JSON.stringify(value)) || "") + expires + "; path=/; SameSite=Lax";
+            } catch (e) {
+                console.warn("Zapis ciasteczek zablokowany:", e);
+            }
+        }
+
+        function getCookie(name) {
+            try {
+                let nameEQ = name + "=";
+                let ca = document.cookie.split(';');
+                for (let i = 0; i < ca.length; i++) {
+                    let c = ca[i];
+                    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                    if (c.indexOf(nameEQ) === 0) {
+                        return JSON.parse(decodeURIComponent(c.substring(nameEQ.length, c.length)));
+                    }
+                }
+            } catch (e) {
+                console.warn("Odczyt ciasteczek zablokowany:", e);
+            }
+            return null;
+        }
+
+        // Definicja domyślnego miasta jako Bydgoszcz
+        const DEFAULT_LOCATION = { name: "Bydgoszcz", country: "Polska", lat: 53.1235, lon: 18.0084 };
+        let currentLocation = DEFAULT_LOCATION;
         
-        // Bezpieczny odczyt z localStorage z obsługą wyjątków WebView
-        try {
-            const savedLoc = localStorage.getItem('weather_app_loc');
-            if (savedLoc) currentLocation = JSON.parse(savedLoc);
-        } catch (e) {
-            console.warn("Brak dostępu do localStorage w WebView (DOM Storage wyłączone).", e);
+        // Bezpieczny, kaskadowy odczyt lokalizacji (localStorage -> sessionStorage -> cookies -> default)
+        function loadSavedLocation() {
+            try {
+                const saved = localStorage.getItem('weather_app_loc');
+                if (saved) return JSON.parse(saved);
+            } catch (e) {
+                console.warn("Brak dostępu do localStorage.");
+            }
+
+            try {
+                const saved = sessionStorage.getItem('weather_app_loc');
+                if (saved) return JSON.parse(saved);
+            } catch (e) {
+                console.warn("Brak dostępu do sessionStorage.");
+            }
+
+            try {
+                const saved = getCookie('weather_app_loc');
+                if (saved) return saved;
+            } catch (e) {
+                console.warn("Brak dostępu do ciasteczek.");
+            }
+
+            return DEFAULT_LOCATION;
+        }
+
+        // Bezpieczny, kaskadowy zapis lokalizacji
+        function saveLocation(loc) {
+            currentLocation = loc;
+
+            try {
+                localStorage.setItem('weather_app_loc', JSON.stringify(loc));
+            } catch (e) {}
+
+            try {
+                sessionStorage.setItem('weather_app_loc', JSON.stringify(loc));
+            } catch (e) {}
+
+            try {
+                setCookie('weather_app_loc', loc, 365);
+            } catch (e) {}
         }
 
         let currentMode = 'today';
@@ -90,7 +159,7 @@
         let hourlyChart = null;
 
         function fetchWeatherData() {
-            // Dodajemy unikalny timestamp by oszukać agresywny cache w WebView
+            // Unikalny timestamp zapobiegający agresywnemu cache'owaniu w WebView
             const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current_weather=true&hourly=temperature_2m,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&forecast_days=7&timezone=auto&_t=${new Date().getTime()}`;
             
             $.ajax({
@@ -117,6 +186,36 @@
             });
         }
 
+        // Dynamiczne wyszukiwanie z adresu URL (?city=Nazwa lub ?q=Nazwa)
+        function fetchLocationFromUrlQuery(query) {
+            $.ajax({
+                url: `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&language=pl&count=1`,
+                cache: false,
+                crossDomain: true,
+                success: function(data) {
+                    if (data.results && data.results.length > 0) {
+                        const city = data.results[0];
+                        const newLoc = { 
+                            name: city.name, 
+                            country: city.country || "Polska", 
+                            lat: city.latitude, 
+                            lon: city.longitude 
+                        };
+                        saveLocation(newLoc); // Zapisz, aby zapamiętać tę zmianę lokalnie
+                    } else {
+                        console.warn(`Nie odnaleziono miasta z zapytania URL: "${query}". Ładowanie ostatniej lokalizacji.`);
+                        currentLocation = loadSavedLocation();
+                    }
+                    fetchWeatherData();
+                },
+                error: function() {
+                    console.error("Błąd podczas automatycznego wyszukiwania z parametru URL.");
+                    currentLocation = loadSavedLocation();
+                    fetchWeatherData();
+                }
+            });
+        }
+
         function searchCity(query) {
             if(query.length < 2) return;
             $.ajax({
@@ -130,12 +229,8 @@
                             $('<button>').addClass('w-full text-left p-[4vmin] bg-white rounded-[2vmin] hover:bg-slate-100')
                                 .html(`<div class="font-bold text-[3.5vmin]">${city.name}</div><div class="text-[3vmin] text-slate-500">${city.country}</div>`)
                                 .on('click', () => {
-                                    currentLocation = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
-                                    try {
-                                        localStorage.setItem('weather_app_loc', JSON.stringify(currentLocation));
-                                    } catch (e) {
-                                        console.warn("Nie można zapisać do localStorage", e);
-                                    }
+                                    const newLoc = { name: city.name, country: city.country, lat: city.latitude, lon: city.longitude };
+                                    saveLocation(newLoc);
                                     $('#search-panel').addClass('hidden');
                                     fetchWeatherData();
                                 }).appendTo(resultsDiv);
@@ -161,7 +256,7 @@
                 const rightX = xAxis.left + (xAxis.width * Math.min(1, Math.max(0, pct)));
 
                 ctx.save();
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.08)'; // Bardzo subtelne, eleganckie przyciemnienie przeszłości
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.08)'; // Subtelne przyciemnienie przeszłości
                 ctx.fillRect(xAxis.left, yAxis.top, rightX - xAxis.left, yAxis.bottom - yAxis.top);
                 ctx.restore();
             }
@@ -189,13 +284,13 @@
                 }
             }
 
-            // Deszcz z przeźroczystością 60%
+            // Wykres deszczu ze zoptymalizowaną przeźroczystością
             const datasets = [
                 { label: 'Deszcz', data: dataRain, type: 'bar', backgroundColor: 'rgba(14, 165, 233, 0.6)', yAxisID: 'y1', order: 2 },
                 { label: 'Temp', data: dataTemp, type: 'line', borderColor: '#f97316', fill: false, tension: 0.4, order: 1 }
             ];
 
-            // W widoku tygodniowym dodajemy drugą linię dla temperatury minimalnej
+            // Druga linia dla temperatury minimalnej w widoku tygodniowym
             if(currentMode === 'week') {
                 datasets.push({ label: 'Temp Min', data: dataTempMin, type: 'line', borderColor: '#3b82f6', fill: false, tension: 0.4, order: 1 });
             }
@@ -235,7 +330,17 @@
 
         $(window).on('load', () => {
             lucide.createIcons();
-            fetchWeatherData();
+            
+            // Odczyt parametrów query z adresu URL (np. ?city=Poznan lub ?q=Poznan)
+            const urlParams = new URLSearchParams(window.location.search);
+            const cityQuery = urlParams.get('city') || urlParams.get('q');
+            
+            if (cityQuery) {
+                fetchLocationFromUrlQuery(cityQuery.trim());
+            } else {
+                currentLocation = loadSavedLocation();
+                fetchWeatherData();
+            }
         });
     </script>
 </body>
